@@ -51,10 +51,22 @@ npm install
 browsing the board works without it, since featured + live jobs don't
 need a database):
 
+Option A: use Vercel + Neon (recommended)
 ```bash
 vercel link                              # links this folder to your Vercel project
 vercel env pull .env.development.local   # downloads DATABASE_URL locally
 ```
+
+Option B: use a local Postgres database
+1. Install Postgres locally.
+2. Create a database:
+   ```bash
+   createdb harborjobs
+   ```
+3. Add a local env file at `.env.local`:
+   ```bash
+   DATABASE_URL=postgres://postgres:password@localhost:5432/harborjobs
+   ```
 
 **Run it:**
 
