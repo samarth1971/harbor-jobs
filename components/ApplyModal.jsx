@@ -1,20 +1,38 @@
 'use client';
 
 import { useState } from 'react';
-import { addApplication } from '@/lib/jobs';
 
 export default function ApplyModal({ job, onClose }) {
   const [form, setForm] = useState({ name: '', email: '', link: '', note: '' });
-  const [sent, setSent] = useState(false);
+  const [status, setStatus] = useState('idle'); // idle | submitting | sent | error
+  const [error, setError] = useState('');
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    addApplication({ jobId: job.id, jobTitle: job.title, ...form });
-    setSent(true);
+    setStatus('submitting');
+    setError('');
+
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id, jobTitle: job.title, ...form }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Something went wrong sending this application.');
+      }
+
+      setStatus('sent');
+    } catch (err) {
+      setStatus('error');
+      setError(err.message);
+    }
   }
 
   return (
@@ -30,7 +48,7 @@ export default function ApplyModal({ job, onClose }) {
         aria-modal="true"
         aria-label={`Apply to ${job.title}`}
       >
-        {sent ? (
+        {status === 'sent' ? (
           <div className="py-6 text-center">
             <p className="font-display text-xl text-harbor-900">Application sent.</p>
             <p className="mt-2 text-sm text-ink/70">
@@ -51,6 +69,12 @@ export default function ApplyModal({ job, onClose }) {
             <h2 className="mt-1 font-display text-xl font-medium text-harbor-900">
               {job.title} · {job.company}
             </h2>
+
+            {status === 'error' && (
+              <div className="mt-4 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+                {error}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <input
@@ -91,9 +115,10 @@ export default function ApplyModal({ job, onClose }) {
                 </button>
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-harbor-800 px-5 py-2.5 font-medium text-paper hover:bg-harbor-900"
+                  disabled={status === 'submitting'}
+                  className="w-full rounded-xl bg-harbor-800 px-5 py-2.5 font-medium text-paper hover:bg-harbor-900 disabled:opacity-60"
                 >
-                  Send application
+                  {status === 'submitting' ? 'Sending…' : 'Send application'}
                 </button>
               </div>
             </form>

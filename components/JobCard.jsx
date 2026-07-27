@@ -1,11 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { daysSincePosted } from '@/lib/jobs';
+import { daysSincePosted } from '@/lib/seedJobs';
 import TideDot from './TideDot';
+
+const SOURCE_LABEL = {
+  live: 'Live feed',
+  posted: 'Community posted',
+  featured: null, // "Featured" already appears as a tag
+};
 
 export default function JobCard({ job }) {
   const days = daysSincePosted(job.postedAt);
+  const sourceLabel = SOURCE_LABEL[job.source];
 
   return (
     <Link
@@ -30,8 +37,8 @@ export default function JobCard({ job }) {
         <span className="text-brass-600">{job.salary}</span>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {job.tags.map((tag) => (
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {(job.tags || []).map((tag) => (
           <span
             key={tag}
             className="rounded-full bg-harbor-800/5 px-2.5 py-1 font-mono text-[11px] text-harbor-800/80"
@@ -39,6 +46,11 @@ export default function JobCard({ job }) {
             {tag}
           </span>
         ))}
+        {sourceLabel && (
+          <span className="ml-auto rounded-full bg-harbor-600/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide text-harbor-600">
+            {sourceLabel}
+          </span>
+        )}
       </div>
     </Link>
   );

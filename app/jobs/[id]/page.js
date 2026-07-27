@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import TideDot from '@/components/TideDot';
 import ApplyModal from '@/components/ApplyModal';
-import { getJob, daysSincePosted } from '@/lib/jobs';
+import { daysSincePosted } from '@/lib/seedJobs';
 
 export default function JobDetailPage() {
   const { id } = useParams();
@@ -14,7 +14,18 @@ export default function JobDetailPage() {
   const [applying, setApplying] = useState(false);
 
   useEffect(() => {
-    setJob(getJob(id));
+    let cancelled = false;
+    fetch(`/api/jobs/${id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled) setJob(data);
+      })
+      .catch(() => {
+        if (!cancelled) setJob(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   if (job === undefined) {
@@ -41,6 +52,7 @@ export default function JobDetailPage() {
   }
 
   const days = daysSincePosted(job.postedAt);
+  const isLive = job.source === 'live' && job.applyUrl;
 
   return (
     <>
@@ -70,7 +82,7 @@ export default function JobDetailPage() {
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
-          {job.tags.map((tag) => (
+          {(job.tags || []).map((tag) => (
             <span
               key={tag}
               className="rounded-full bg-harbor-800/5 px-2.5 py-1 font-mono text-[11px] text-harbor-800/80"
@@ -84,12 +96,29 @@ export default function JobDetailPage() {
           {job.description}
         </p>
 
-        <button
-          onClick={() => setApplying(true)}
-          className="mt-10 rounded-xl bg-brass-400 px-6 py-3 font-medium text-harbor-900 transition hover:bg-brass-600 hover:text-paper"
-        >
-          Apply for this role
-        </button>
+        {isLive ? (
+          <div className="mt-10">
+            <a
+              href={job.applyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block rounded-xl bg-brass-400 px-6 py-3 font-medium text-harbor-900 transition hover:bg-brass-600 hover:text-paper"
+            >
+              Apply on original listing ↗
+            </a>
+            <p className="mt-2 text-xs text-ink/50">
+              This role is pulled from a live external feed — applying takes you to the real
+              posting so your application actually reaches {job.company}.
+            </p>
+          </div>
+        ) : (
+          <button
+            onClick={() => setApplying(true)}
+            className="mt-10 rounded-xl bg-brass-400 px-6 py-3 font-medium text-harbor-900 transition hover:bg-brass-600 hover:text-paper"
+          >
+            Apply for this role
+          </button>
+        )}
       </main>
 
       {applying && <ApplyModal job={job} onClose={() => setApplying(false)} />}

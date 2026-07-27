@@ -1,6 +1,6 @@
 'use client';
 
-import { freshnessLabel } from '@/lib/jobs';
+import { freshnessLabel } from '@/lib/seedJobs';
 
 // Signature element: a small "tide" dot whose brightness signals how
 // recently a role was posted — full brass at day 0, fading toward the

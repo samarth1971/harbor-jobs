@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
-import { addJob } from '@/lib/jobs';
 
 const initial = {
   title: '',
@@ -18,23 +17,42 @@ const initial = {
 export default function PostJobPage() {
   const router = useRouter();
   const [form, setForm] = useState(initial);
-  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState('idle'); // idle | submitting | error
+  const [error, setError] = useState('');
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    const job = addJob({
-      ...form,
-      tags: form.tags
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean),
-    });
-    setSubmitted(true);
-    setTimeout(() => router.push(`/jobs/${job.id}`), 900);
+    setStatus('submitting');
+    setError('');
+
+    try {
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          tags: form.tags
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean),
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Something went wrong posting this job.');
+      }
+
+      const data = await res.json();
+      router.push(`/jobs/${data.id}`);
+    } catch (err) {
+      setStatus('error');
+      setError(err.message);
+    }
   }
 
   return (
@@ -50,6 +68,12 @@ export default function PostJobPage() {
         <p className="mt-3 max-w-md text-sm leading-relaxed text-ink/70">
           Listings go live immediately and stay up as long as you like. No approval queue.
         </p>
+
+        {status === 'error' && (
+          <div className="mt-6 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="mt-10 space-y-5">
           <Field label="Job title">
@@ -128,10 +152,10 @@ export default function PostJobPage() {
 
           <button
             type="submit"
-            disabled={submitted}
+            disabled={status === 'submitting'}
             className="w-full rounded-xl bg-harbor-800 px-5 py-3 font-medium text-paper transition hover:bg-harbor-900 disabled:opacity-60"
           >
-            {submitted ? 'Listing posted — redirecting…' : 'Post listing'}
+            {status === 'submitting' ? 'Posting…' : 'Post listing'}
           </button>
         </form>
       </main>
