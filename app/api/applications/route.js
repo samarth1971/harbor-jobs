@@ -1,5 +1,23 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 import { sql, ensureSchema } from '@/lib/db';
+
+// Admin-only: list all applications received, most recent first.
+export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== 'admin') {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
+
+  try {
+    await ensureSchema();
+    const { rows } = await sql`SELECT * FROM applications ORDER BY submitted_at DESC`;
+    return NextResponse.json({ applications: rows });
+  } catch (err) {
+    return NextResponse.json({ applications: [] });
+  }
+}
 
 export async function POST(request) {
   const body = await request.json();

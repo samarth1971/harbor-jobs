@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { sql, ensureSchema, rowToJob } from '@/lib/db';
 import { FEATURED_JOBS } from '@/lib/seedJobs';
 import { fetchExternalJobs } from '@/lib/externalJobs';
+import { fetchAdzunaJobs } from '@/lib/adzunaJobs';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,9 +25,12 @@ export async function GET(request) {
     console.error('Database unavailable, continuing without posted jobs:', err.message);
   }
 
-  const externalJobs = await fetchExternalJobs();
+  const [externalJobs, indiaJobs] = await Promise.all([
+    fetchExternalJobs(),
+    fetchAdzunaJobs(),
+  ]);
 
-  let all = [...postedJobs, ...FEATURED_JOBS, ...externalJobs];
+  let all = [...postedJobs, ...FEATURED_JOBS, ...externalJobs, ...indiaJobs];
 
   if (q) {
     all = all.filter((job) =>
@@ -52,6 +56,7 @@ export async function GET(request) {
       posted: postedJobs.length,
       featured: FEATURED_JOBS.length,
       live: externalJobs.length,
+      liveIndia: indiaJobs.length,
     },
   });
 }
