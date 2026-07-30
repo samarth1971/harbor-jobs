@@ -1,6 +1,11 @@
+'use client';
+
 import Link from 'next/link';
+import { useSession, signIn, signOut } from 'next-auth/react';
 
 export default function Navbar() {
+  const { data: session, status } = useSession();
+
   return (
     <header className="relative z-10 border-b border-harbor-800/10">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
@@ -29,6 +34,31 @@ export default function Navbar() {
           >
             Post a job
           </Link>
+          {status === 'authenticated' && session.user.role === 'admin' && (
+            <Link href="/admin" className="text-harbor-800/70 transition hover:text-harbor-800">
+              Admin
+            </Link>
+          )}
+          {status === 'authenticated' ? (
+            <button
+              onClick={() => signOut()}
+              className="flex items-center gap-2 text-harbor-800/70 transition hover:text-harbor-800"
+              title={session.user.email}
+            >
+              {session.user.image && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={session.user.image} alt="" className="h-6 w-6 rounded-full" />
+              )}
+              Sign out
+            </button>
+          ) : (
+            <button
+              onClick={() => signIn('google')}
+              className="text-harbor-800/70 transition hover:text-harbor-800"
+            >
+              Sign in
+            </button>
+          )}
         </nav>
       </div>
     </header>

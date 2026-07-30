@@ -4,6 +4,17 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 
+function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 const initial = {
   title: '',
   company: '',
@@ -24,31 +35,96 @@ export default function PostJobPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  async function postJob() {
+    const res = await fetch('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...form,
+        tags: form.tags
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean),
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || 'Something went wrong posting this job.');
+    }
+
+    const data = await res.json();
+    router.push(`/jobs/${data.id}`);
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setStatus('submitting');
     setError('');
 
     try {
-      const res = await fetch('/api/jobs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          tags: form.tags
-            .split(',')
-            .map((t) => t.trim())
-            .filter(Boolean),
-        }),
-      });
+      // Create a Razorpay order for the posting fee first.
+      const orderRes = await fetch('/api/payments/create-order', { method: 'POST' });
+      const order = await orderRes.json();
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Something went wrong posting this job.');
+      if (!orderRes.ok) {
+        // Payments not configured yet (no RAZORPAY_KEY_ID/SECRET) — fall
+        // back to posting for free rather than blocking the whole board.
+        console.warn('Payments unavailable, posting without a fee:', order.error);
+        await postJob();
+        return;
       }
 
-      const data = await res.json();
-      router.push(`/jobs/${data.id}`);
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        throw new Error('Could not load the payment widget. Check your connection and try again.');
+      }
+
+      const rzp = new window.Razorpay({
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.orderId,
+        name: 'Harbor Jobs',
+        description: 'Job posting fee',
+        // Razorpay's checkout shows UPI (with QR code), cards, netbanking,
+        // and wallets all in this one widget.
+        handler: async (response) => {
+          try {
+            const verifyRes = await fetch('/api/payments/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+              }),
+            });
+
+            if (!verifyRes.ok) {
+              throw new Error('Payment could not be verified. You have not been charged, please try again.');
+            }
+
+            await postJob();
+          } catch (err) {
+            setStatus('error');
+            setError(err.message);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setStatus('idle');
+          },
+        },
+        theme: { color: '#1F4D46' },
+      });
+
+      rzp.on('payment.failed', (response) => {
+        setStatus('error');
+        setError(response.error?.description || 'Payment failed. Please try again.');
+      });
+
+      rzp.open();
     } catch (err) {
       setStatus('error');
       setError(err.message);
@@ -150,12 +226,16 @@ export default function PostJobPage() {
             />
           </Field>
 
+          <p className="text-xs text-harbor-800/60">
+            Posting a listing costs a small fee, payable by UPI, card, or netbanking via Razorpay.
+          </p>
+
           <button
             type="submit"
             disabled={status === 'submitting'}
             className="w-full rounded-xl bg-harbor-800 px-5 py-3 font-medium text-paper transition hover:bg-harbor-900 disabled:opacity-60"
           >
-            {status === 'submitting' ? 'Posting…' : 'Post listing'}
+            {status === 'submitting' ? 'Processing…' : 'Pay & post listing'}
           </button>
         </form>
       </main>

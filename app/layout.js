@@ -1,5 +1,6 @@
 import { Fraunces, Inter, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
+import SessionProviderWrapper from '@/components/SessionProviderWrapper';
 
 const fraunces = Fraunces({
   subsets: ['latin'],
@@ -32,7 +33,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${fraunces.variable} ${inter.variable} ${plexMono.variable}`}>
-      <body className="grain relative min-h-screen">{children}</body>
+      <body className="grain relative min-h-screen">
+        <SessionProviderWrapper>{children}</SessionProviderWrapper>
+      </body>
     </html>
   );
 }
