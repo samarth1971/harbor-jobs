@@ -32,12 +32,14 @@ export default function PostJobPage() {
   const [status, setStatus] = useState('idle'); // idle | submitting | error
   const [error, setError] = useState('');
   const [upiDetails, setUpiDetails] = useState(null); // set to show the UPI modal
+  const [upiPhase, setUpiPhase] = useState('form'); // 'form' | 'success'
+  const [upiError, setUpiError] = useState('');
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  async function postJob(paymentInfo = {}) {
+  async function submitJobPost(paymentInfo = {}) {
     const res = await fetch('/api/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -56,8 +58,7 @@ export default function PostJobPage() {
       throw new Error(data.error || 'Something went wrong posting this job.');
     }
 
-    const data = await res.json();
-    router.push(`/jobs/${data.id}`);
+    return res.json(); // { id }
   }
 
   async function handleSubmit(e) {
@@ -82,7 +83,8 @@ export default function PostJobPage() {
 
       if (!orderRes.ok) {
         console.warn('No payment method configured, posting without a fee:', order.error);
-        await postJob();
+        const { id } = await submitJobPost();
+        router.push(`/jobs/${id}`);
         return;
       }
 
@@ -114,7 +116,11 @@ export default function PostJobPage() {
               throw new Error('Payment could not be verified. You have not been charged, please try again.');
             }
 
-            await postJob({ paymentMethod: 'razorpay', paymentReference: response.razorpay_payment_id });
+            const { id } = await submitJobPost({
+              paymentMethod: 'razorpay',
+              paymentReference: response.razorpay_payment_id,
+            });
+            router.push(`/jobs/${id}`);
           } catch (err) {
             setStatus('error');
             setError(err.message);
@@ -140,18 +146,29 @@ export default function PostJobPage() {
 
   async function handleUpiConfirm(reference) {
     setStatus('submitting');
+    setUpiError('');
     try {
-      await postJob({ paymentMethod: 'upi', paymentReference: reference });
+      await submitJobPost({ paymentMethod: 'upi', paymentReference: reference });
+      setUpiPhase('success');
+      setTimeout(() => {
+        setUpiDetails(null);
+        setUpiPhase('form');
+        setStatus('idle');
+        router.push('/');
+      }, 1800);
     } catch (err) {
-      setStatus('error');
-      setError(err.message);
-    } finally {
-      setUpiDetails(null);
+      // Keep the modal open and show the error inline, instead of silently
+      // closing it — the earlier version did this and looked like a blank
+      // screen with no feedback at all.
+      setStatus('idle');
+      setUpiError(err.message);
     }
   }
 
   function handleUpiCancel() {
     setUpiDetails(null);
+    setUpiPhase('form');
+    setUpiError('');
     setStatus('idle');
   }
 
@@ -270,6 +287,8 @@ export default function PostJobPage() {
           onConfirm={handleUpiConfirm}
           onCancel={handleUpiCancel}
           submitting={status === 'submitting'}
+          phase={upiPhase}
+          errorMessage={upiError}
         />
       )}
     </>

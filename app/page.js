@@ -1,10 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import JobCard from '@/components/JobCard';
 
 export default function HomePage() {
+  const searchParams = useSearchParams();
+  const [showPostedBanner, setShowPostedBanner] = useState(false);
   const [query, setQuery] = useState('');
   const [type, setType] = useState('All');
   const [jobs, setJobs] = useState([]);
@@ -46,10 +49,24 @@ export default function HomePage() {
     load(next, false, query, type);
   }
 
+  useEffect(() => {
+    if (searchParams.get('posted') === '1') {
+      setShowPostedBanner(true);
+      const timer = setTimeout(() => setShowPostedBanner(false), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
+
   return (
     <>
       <Navbar />
       <main className="relative z-10 mx-auto max-w-5xl px-6 pb-24">
+        {showPostedBanner && (
+          <div className="mt-6 flex items-center gap-2 rounded-xl border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800">
+            <span className="text-base">✓</span>
+            Payment confirmed — your job listing is live below.
+          </div>
+        )}
         <section className="pt-16 pb-10 sm:pt-20">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-brass-600">
             {total === null ? 'Loading the harbor…' : `${total} roles currently docked`}
