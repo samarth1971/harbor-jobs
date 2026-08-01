@@ -61,6 +61,11 @@ export default function AdminDashboard() {
                 <p className="text-sm text-harbor-800/60">
                   {job.company} · {job.location}
                 </p>
+                {job.paymentReference && (
+                  <p className="mt-0.5 font-mono text-xs text-harbor-600">
+                    {job.paymentMethod || 'payment'} ref: {job.paymentReference}
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => handleDelete(job.id)}
