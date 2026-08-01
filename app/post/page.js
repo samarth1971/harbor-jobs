@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
+import UpiPaymentModal from '@/components/UpiPaymentModal';
 
 function loadRazorpayScript() {
   return new Promise((resolve) => {
@@ -30,12 +31,13 @@ export default function PostJobPage() {
   const [form, setForm] = useState(initial);
   const [status, setStatus] = useState('idle'); // idle | submitting | error
   const [error, setError] = useState('');
+  const [upiDetails, setUpiDetails] = useState(null); // set to show the UPI modal
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  async function postJob() {
+  async function postJob(paymentInfo = {}) {
     const res = await fetch('/api/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -45,6 +47,7 @@ export default function PostJobPage() {
           .split(',')
           .map((t) => t.trim())
           .filter(Boolean),
+        ...paymentInfo,
       }),
     });
 
@@ -63,14 +66,22 @@ export default function PostJobPage() {
     setError('');
 
     try {
-      // Create a Razorpay order for the posting fee first.
+      // Preferred path: direct UPI (no gateway account, no approval needed).
+      const upiRes = await fetch('/api/payments/upi-details');
+      const upi = await upiRes.json();
+
+      if (upiRes.ok) {
+        setUpiDetails(upi);
+        setStatus('idle');
+        return; // wait for the modal — handleUpiConfirm / handleUpiCancel take over
+      }
+
+      // Fall back to Razorpay, in case that gets approved later.
       const orderRes = await fetch('/api/payments/create-order', { method: 'POST' });
       const order = await orderRes.json();
 
       if (!orderRes.ok) {
-        // Payments not configured yet (no RAZORPAY_KEY_ID/SECRET) — fall
-        // back to posting for free rather than blocking the whole board.
-        console.warn('Payments unavailable, posting without a fee:', order.error);
+        console.warn('No payment method configured, posting without a fee:', order.error);
         await postJob();
         return;
       }
@@ -87,8 +98,6 @@ export default function PostJobPage() {
         order_id: order.orderId,
         name: 'Harbor Jobs',
         description: 'Job posting fee',
-        // Razorpay's checkout shows UPI (with QR code), cards, netbanking,
-        // and wallets all in this one widget.
         handler: async (response) => {
           try {
             const verifyRes = await fetch('/api/payments/verify', {
@@ -105,16 +114,14 @@ export default function PostJobPage() {
               throw new Error('Payment could not be verified. You have not been charged, please try again.');
             }
 
-            await postJob();
+            await postJob({ paymentMethod: 'razorpay', paymentReference: response.razorpay_payment_id });
           } catch (err) {
             setStatus('error');
             setError(err.message);
           }
         },
         modal: {
-          ondismiss: () => {
-            setStatus('idle');
-          },
+          ondismiss: () => setStatus('idle'),
         },
         theme: { color: '#1F4D46' },
       });
@@ -129,6 +136,23 @@ export default function PostJobPage() {
       setStatus('error');
       setError(err.message);
     }
+  }
+
+  async function handleUpiConfirm(reference) {
+    setStatus('submitting');
+    try {
+      await postJob({ paymentMethod: 'upi', paymentReference: reference });
+    } catch (err) {
+      setStatus('error');
+      setError(err.message);
+    } finally {
+      setUpiDetails(null);
+    }
+  }
+
+  function handleUpiCancel() {
+    setUpiDetails(null);
+    setStatus('idle');
   }
 
   return (
@@ -227,7 +251,7 @@ export default function PostJobPage() {
           </Field>
 
           <p className="text-xs text-harbor-800/60">
-            Posting a listing costs a small fee, payable by UPI, card, or netbanking via Razorpay.
+            Posting a listing costs a small fee, payable by UPI (scan or app link).
           </p>
 
           <button
@@ -239,6 +263,15 @@ export default function PostJobPage() {
           </button>
         </form>
       </main>
+
+      {upiDetails && (
+        <UpiPaymentModal
+          details={upiDetails}
+          onConfirm={handleUpiConfirm}
+          onCancel={handleUpiCancel}
+          submitting={status === 'submitting'}
+        />
+      )}
     </>
   );
 }
