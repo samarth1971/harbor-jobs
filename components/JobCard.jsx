@@ -20,11 +20,21 @@ export default function JobCard({ job }) {
       className="group block rounded-2xl border border-harbor-800/10 bg-white/40 p-6 transition hover:border-harbor-800/25 hover:bg-white/70 hover:shadow-[0_8px_24px_-12px_rgba(15,43,39,0.25)]"
     >
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="font-display text-lg font-medium text-harbor-900 group-hover:text-harbor-600">
-            {job.title}
-          </h3>
-          <p className="mt-0.5 text-sm text-ink/70">{job.company}</p>
+        <div className="flex items-start gap-3">
+          {job.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={job.logoUrl}
+              alt={`${job.company} logo`}
+              className="h-10 w-10 shrink-0 rounded-lg border border-harbor-800/10 object-cover"
+            />
+          )}
+          <div>
+            <h3 className="font-display text-lg font-medium text-harbor-900 group-hover:text-harbor-600">
+              {job.title}
+            </h3>
+            <p className="mt-0.5 text-sm text-ink/70">{job.company}</p>
+          </div>
         </div>
         <TideDot days={days} />
       </div>

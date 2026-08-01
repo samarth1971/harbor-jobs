@@ -87,7 +87,7 @@ export async function POST(request) {
   const tags = Array.isArray(body.tags) ? body.tags : [];
 
   await sql`
-    INSERT INTO jobs (id, title, company, location, type, salary, tags, description)
+    INSERT INTO jobs (id, title, company, location, type, salary, tags, description, logo_url)
     VALUES (
       ${id},
       ${body.title},
@@ -96,7 +96,8 @@ export async function POST(request) {
       ${body.type || 'Full-time'},
       ${body.salary || ''},
       ${JSON.stringify(tags)}::jsonb,
-      ${body.description}
+      ${body.description},
+      ${body.logoUrl || null}
     )
   `;
 
