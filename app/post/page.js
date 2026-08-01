@@ -24,6 +24,7 @@ const initial = {
   salary: '',
   tags: '',
   description: '',
+  logoUrl: '',
 };
 
 export default function PostJobPage() {
@@ -34,9 +35,38 @@ export default function PostJobPage() {
   const [upiDetails, setUpiDetails] = useState(null); // set to show the UPI modal
   const [upiPhase, setUpiPhase] = useState('form'); // 'form' | 'success'
   const [upiError, setUpiError] = useState('');
+  const [logoPreview, setLogoPreview] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleLogoChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLogoPreview(URL.createObjectURL(file));
+    setUploadingLogo(true);
+    setError('');
+
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Could not upload the image.');
+      }
+
+      update('logoUrl', data.url);
+    } catch (err) {
+      setError(err.message);
+      setLogoPreview('');
+    } finally {
+      setUploadingLogo(false);
+    }
   }
 
   async function submitJobPost(paymentInfo = {}) {
@@ -247,6 +277,30 @@ export default function PostJobPage() {
             </Field>
           </div>
 
+          <Field label="Company logo (optional)">
+            <div className="flex items-center gap-4">
+              {logoPreview && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoPreview}
+                  alt="Logo preview"
+                  className="h-14 w-14 rounded-lg border border-harbor-800/15 object-cover"
+                />
+              )}
+              <label className="flex-1">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={handleLogoChange}
+                  className="block w-full text-sm text-ink/70 file:mr-4 file:rounded-lg file:border-0 file:bg-harbor-800 file:px-4 file:py-2 file:text-sm file:font-medium file:text-paper hover:file:bg-harbor-900"
+                />
+                {uploadingLogo && (
+                  <p className="mt-1 text-xs text-harbor-800/60">Uploading…</p>
+                )}
+              </label>
+            </div>
+          </Field>
+
           <Field label="Tags (comma separated)">
             <input
               value={form.tags}
@@ -273,10 +327,10 @@ export default function PostJobPage() {
 
           <button
             type="submit"
-            disabled={status === 'submitting'}
+            disabled={status === 'submitting' || uploadingLogo}
             className="w-full rounded-xl bg-harbor-800 px-5 py-3 font-medium text-paper transition hover:bg-harbor-900 disabled:opacity-60"
           >
-            {status === 'submitting' ? 'Processing…' : 'Pay & post listing'}
+            {status === 'submitting' ? 'Processing…' : uploadingLogo ? 'Uploading logo…' : 'Pay & post listing'}
           </button>
         </form>
       </main>
