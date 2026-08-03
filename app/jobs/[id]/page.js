@@ -66,9 +66,19 @@ export default function JobDetailPage() {
         </button>
 
         <div className="mt-5 flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-display text-3xl font-medium text-harbor-900">{job.title}</h1>
-            <p className="mt-1 text-base text-ink/70">{job.company}</p>
+          <div className="flex items-start gap-4">
+            {job.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={job.logoUrl}
+                alt={`${job.company} logo`}
+                className="h-14 w-14 shrink-0 rounded-xl border border-harbor-800/10 object-cover"
+              />
+            )}
+            <div>
+              <h1 className="font-display text-3xl font-medium text-harbor-900">{job.title}</h1>
+              <p className="mt-1 text-base text-ink/70">{job.company}</p>
+            </div>
           </div>
           <TideDot days={days} />
         </div>

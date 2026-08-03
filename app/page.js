@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, Suspense, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import JobCard from '@/components/JobCard';
+import PostedBanner from '@/components/PostedBanner';
 
 export default function HomePage() {
   const [query, setQuery] = useState('');
@@ -50,6 +51,9 @@ export default function HomePage() {
     <>
       <Navbar />
       <main className="relative z-10 mx-auto max-w-5xl px-6 pb-24">
+        <Suspense fallback={null}>
+          <PostedBanner />
+        </Suspense>
         <section className="pt-16 pb-10 sm:pt-20">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-brass-600">
             {total === null ? 'Loading the harbor…' : `${total} roles currently docked`}

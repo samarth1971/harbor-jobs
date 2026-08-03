@@ -6,7 +6,7 @@ import { useState } from 'react';
 // code (via the free api.qrserver.com image API, generated client-side
 // from the UPI deep link — no third-party account or key needed for
 // this either) plus an "Open in UPI app" button for mobile users.
-export default function UpiPaymentModal({ details, onConfirm, onCancel, submitting }) {
+export default function UpiPaymentModal({ details, onConfirm, onCancel, submitting, phase, errorMessage }) {
   const [reference, setReference] = useState('');
   const [touched, setTouched] = useState(false);
 
@@ -18,6 +18,24 @@ export default function UpiPaymentModal({ details, onConfirm, onCancel, submitti
     setTouched(true);
     if (reference.trim().length < 4) return;
     onConfirm(reference.trim());
+  }
+
+  if (phase === 'success') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+        <div className="w-full max-w-sm rounded-2xl bg-paper p-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-2xl text-green-700">
+            ✓
+          </div>
+          <h2 className="mt-4 font-display text-xl font-medium text-harbor-900">
+            Payment confirmed
+          </h2>
+          <p className="mt-2 text-sm text-ink/70">
+            Your listing is live. Taking you back to the board…
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -63,6 +81,12 @@ export default function UpiPaymentModal({ details, onConfirm, onCancel, submitti
           {touched && reference.trim().length < 4 && (
             <p className="mt-1 text-xs text-red-600">
               Enter the reference number shown in your UPI app after payment.
+            </p>
+          )}
+          {errorMessage && (
+            <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+              {errorMessage} You have not been charged again — fix the details above and try
+              confirming once more.
             </p>
           )}
         </div>

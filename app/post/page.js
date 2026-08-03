@@ -24,6 +24,7 @@ const initial = {
   salary: '',
   tags: '',
   description: '',
+  logoUrl: '',
 };
 
 export default function PostJobPage() {
@@ -32,12 +33,43 @@ export default function PostJobPage() {
   const [status, setStatus] = useState('idle'); // idle | submitting | error
   const [error, setError] = useState('');
   const [upiDetails, setUpiDetails] = useState(null); // set to show the UPI modal
+  const [upiPhase, setUpiPhase] = useState('form'); // 'form' | 'success'
+  const [upiError, setUpiError] = useState('');
+  const [logoPreview, setLogoPreview] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   function update(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  async function postJob(paymentInfo = {}) {
+  async function handleLogoChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLogoPreview(URL.createObjectURL(file));
+    setUploadingLogo(true);
+    setError('');
+
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Could not upload the image.');
+      }
+
+      update('logoUrl', data.url);
+    } catch (err) {
+      setError(err.message);
+      setLogoPreview('');
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
+  async function submitJobPost(paymentInfo = {}) {
     const res = await fetch('/api/jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -56,8 +88,7 @@ export default function PostJobPage() {
       throw new Error(data.error || 'Something went wrong posting this job.');
     }
 
-    const data = await res.json();
-    router.push(`/jobs/${data.id}`);
+    return res.json(); // { id }
   }
 
   async function handleSubmit(e) {
@@ -82,7 +113,8 @@ export default function PostJobPage() {
 
       if (!orderRes.ok) {
         console.warn('No payment method configured, posting without a fee:', order.error);
-        await postJob();
+        const { id } = await submitJobPost();
+        router.push(`/jobs/${id}`);
         return;
       }
 
@@ -114,7 +146,11 @@ export default function PostJobPage() {
               throw new Error('Payment could not be verified. You have not been charged, please try again.');
             }
 
-            await postJob({ paymentMethod: 'razorpay', paymentReference: response.razorpay_payment_id });
+            const { id } = await submitJobPost({
+              paymentMethod: 'razorpay',
+              paymentReference: response.razorpay_payment_id,
+            });
+            router.push(`/jobs/${id}`);
           } catch (err) {
             setStatus('error');
             setError(err.message);
@@ -140,18 +176,29 @@ export default function PostJobPage() {
 
   async function handleUpiConfirm(reference) {
     setStatus('submitting');
+    setUpiError('');
     try {
-      await postJob({ paymentMethod: 'upi', paymentReference: reference });
+      await submitJobPost({ paymentMethod: 'upi', paymentReference: reference });
+      setUpiPhase('success');
+      setTimeout(() => {
+        setUpiDetails(null);
+        setUpiPhase('form');
+        setStatus('idle');
+        router.push('/');
+      }, 1800);
     } catch (err) {
-      setStatus('error');
-      setError(err.message);
-    } finally {
-      setUpiDetails(null);
+      // Keep the modal open and show the error inline, instead of silently
+      // closing it — the earlier version did this and looked like a blank
+      // screen with no feedback at all.
+      setStatus('idle');
+      setUpiError(err.message);
     }
   }
 
   function handleUpiCancel() {
     setUpiDetails(null);
+    setUpiPhase('form');
+    setUpiError('');
     setStatus('idle');
   }
 
@@ -230,6 +277,30 @@ export default function PostJobPage() {
             </Field>
           </div>
 
+          <Field label="Company logo (optional)">
+            <div className="flex items-center gap-4">
+              {logoPreview && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoPreview}
+                  alt="Logo preview"
+                  className="h-14 w-14 rounded-lg border border-harbor-800/15 object-cover"
+                />
+              )}
+              <label className="flex-1">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={handleLogoChange}
+                  className="block w-full text-sm text-ink/70 file:mr-4 file:rounded-lg file:border-0 file:bg-harbor-800 file:px-4 file:py-2 file:text-sm file:font-medium file:text-paper hover:file:bg-harbor-900"
+                />
+                {uploadingLogo && (
+                  <p className="mt-1 text-xs text-harbor-800/60">Uploading…</p>
+                )}
+              </label>
+            </div>
+          </Field>
+
           <Field label="Tags (comma separated)">
             <input
               value={form.tags}
@@ -256,10 +327,10 @@ export default function PostJobPage() {
 
           <button
             type="submit"
-            disabled={status === 'submitting'}
+            disabled={status === 'submitting' || uploadingLogo}
             className="w-full rounded-xl bg-harbor-800 px-5 py-3 font-medium text-paper transition hover:bg-harbor-900 disabled:opacity-60"
           >
-            {status === 'submitting' ? 'Processing…' : 'Pay & post listing'}
+            {status === 'submitting' ? 'Processing…' : uploadingLogo ? 'Uploading logo…' : 'Pay & post listing'}
           </button>
         </form>
       </main>
@@ -270,6 +341,8 @@ export default function PostJobPage() {
           onConfirm={handleUpiConfirm}
           onCancel={handleUpiCancel}
           submitting={status === 'submitting'}
+          phase={upiPhase}
+          errorMessage={upiError}
         />
       )}
     </>
