@@ -182,15 +182,9 @@ Merging to `main` is what ships to production — deployment is never
 manual after initial setup. Pull requests also get automatic preview
 deployments from Vercel's native GitHub integration.
 
-### Required GitHub Secrets
-
-Set these under **Repo → Settings → Secrets and variables → Actions**:
-
-| Secret | Where to get it |
-|---|---|
-| `VERCEL_TOKEN` | Vercel dashboard → Settings → Tokens → Create |
-| `VERCEL_ORG_ID` | Run `vercel link` locally once; found in `.vercel/project.json` |
-| `VERCEL_PROJECT_ID` | Same file, `.vercel/project.json` |
+GitHub Actions only runs lint + build checks (no secrets required for
+that). All actual deployments — production and preview — are handled by
+Vercel's own GitHub integration, not by GitHub Actions.
 
 ## 9. Deployment steps (one-time setup)
 

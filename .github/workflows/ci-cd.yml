@@ -1,9 +1,10 @@
 name: CI/CD
 
-# Runs quality checks on every push and PR, and deploys to Vercel
-# production only when main branch checks pass. Preview deployments
-# are handled automatically by Vercel's own GitHub integration for
-# feature branches / PRs (no extra config needed for that part).
+# Runs quality checks (lint + build) on every push and PR. Actual
+# deployment is handled entirely by Vercel's native GitHub integration
+# (auto-deploys on push to main, creates preview URLs for branches/PRs) —
+# there is no separate deploy step here, to avoid two deployment paths
+# fighting each other.
 
 on:
   push:
@@ -36,30 +37,3 @@ jobs:
 
       - name: Build project
         run: npm run build
-
-  deploy:
-    name: Deploy to Vercel (Production)
-    needs: build-and-test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      - name: Pull Vercel environment
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build project artifacts
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy to Vercel
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
